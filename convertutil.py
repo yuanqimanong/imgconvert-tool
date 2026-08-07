@@ -4,6 +4,7 @@ import itertools
 import logging
 import math
 import os
+import sys
 
 try:
     import pymupdf
@@ -23,8 +24,23 @@ JPEG_MAX_SIDE = 65500
 # 控制在这个值以下，生成的图才能被 Pillow 和多数看图软件正常打开
 DEFAULT_MAX_PIXELS = 80_000_000
 
-DEFAULT_OUTPUT_DIR = "./out"
-DEFAULT_PAGES_DIR = "./tmp_images"
+DEFAULT_OUTPUT_DIR = "out"
+DEFAULT_PAGES_DIR = "tmp_images"
+
+
+def base_dir():
+    """默认输出目录的落脚点。
+
+    打包成单文件 EXE 后，双击或从开始菜单启动时的工作目录可能是任意位置，
+    所以要按 EXE 自己所在的目录算；直接跑源码时仍然用当前工作目录。
+    """
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(os.path.abspath(sys.executable))
+    return os.getcwd()
+
+
+def _resolve_dir(path, default):
+    return os.path.abspath(path) if path else os.path.join(base_dir(), default)
 
 
 class ConvertError(Exception):
@@ -126,9 +142,9 @@ class ConvertUtil:
         失败时抛出 ConvertError，message 可直接展示给用户。
         """
         _check_pymupdf()
-        # 默认目录在这里解析而不是写在默认参数里，保证跟随当前工作目录
-        output_dir = os.path.abspath(output_dir or DEFAULT_OUTPUT_DIR)
-        pages_dir = os.path.abspath(pages_dir or DEFAULT_PAGES_DIR)
+        # 默认目录在这里解析而不是写在默认参数里，否则会在 import 时就被固化
+        output_dir = _resolve_dir(output_dir, DEFAULT_OUTPUT_DIR)
+        pages_dir = _resolve_dir(pages_dir, DEFAULT_PAGES_DIR)
         if not pdf_file_path:
             raise ConvertError("请选择文件！")
         pdf_file_path = os.path.abspath(os.path.expanduser(pdf_file_path))

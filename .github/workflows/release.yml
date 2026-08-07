@@ -1,0 +1,82 @@
+name: Release
+
+# 推送 v* 标签时，在各自的系统上打包并发布 Release。
+# PyInstaller 不支持交叉编译，Windows 的 exe 必须在 Windows runner 上构建。
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: 打包 ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: windows-x86_64
+            built: dist/imgconvert.exe
+            artifact: imgconvert-windows-x86_64.exe
+          - os: ubuntu-latest
+            label: linux-x86_64
+            built: dist/imgconvert
+            artifact: imgconvert-linux-x86_64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      # Windows runner 有图形环境，GUI 测试会真的跑；
+      # ubuntu runner 没有 DISPLAY，GUI 测试会自动跳过，核心逻辑测试照常执行。
+      - name: 跑测试
+        run: python -m unittest discover -s tests -v
+
+      - name: 打包
+        run: pyinstaller --noconfirm --onefile --windowed --name imgconvert main.py
+
+      - name: 重命名产物
+        shell: bash
+        run: mv "${{ matrix.built }}" "${{ matrix.artifact }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+          if-no-files-found: error
+
+  release:
+    name: 发布 Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: 创建 Release 并上传产物
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" artifacts/* \
+            --title "${{ github.ref_name }}" \
+            --notes "下载对应系统的可执行文件，双击运行，无需安装 Python。
+
+          - \`imgconvert-windows-x86_64.exe\` — Windows 64 位
+          - \`imgconvert-linux-x86_64\` — Linux 64 位（下载后需 \`chmod +x\`）
+
+          合成图输出在可执行文件所在目录的 \`out\` 子目录下。用法见 [README](https://github.com/${{ github.repository }}#readme)。"

@@ -271,6 +271,30 @@ class ConvertUtilTestCase(unittest.TestCase):
         self.assertFalse(os.path.exists(self.out))
 
 
+class BaseDirTestCase(unittest.TestCase):
+    """默认输出目录的落脚点：跑源码用 CWD，打包成 EXE 用 EXE 所在目录"""
+
+    def test_uses_cwd_when_running_from_source(self):
+        self.assertEqual(convertutil.base_dir(), os.getcwd())
+
+    def test_uses_executable_dir_when_frozen(self):
+        with mock.patch.object(convertutil.sys, "frozen", True, create=True):
+            with mock.patch.object(
+                convertutil.sys, "executable", os.path.join("/opt", "app", "tool.exe")
+            ):
+                self.assertEqual(
+                    convertutil.base_dir(), os.path.abspath(os.path.join("/opt", "app"))
+                )
+
+    def test_explicit_dir_wins(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = os.path.join(tmp, "custom")
+            save_path = ConvertUtil().convert_img(
+                make_pdf(os.path.join(tmp, "a.pdf")), output_dir=out
+            )
+            self.assertEqual(os.path.dirname(save_path), out)
+
+
 class PyMuPDFVersionTestCase(unittest.TestCase):
     def test_old_pymupdf_gets_readable_message(self):
         with mock.patch.object(convertutil.pymupdf, "Page", object):

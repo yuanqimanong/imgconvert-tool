@@ -28,3 +28,14 @@ pip install -r requirements.txt
 ```shell
 python -m unittest discover -s tests -v
 ```
+
+## 打包
+
+```shell
+pip install pyinstaller
+pyinstaller --noconfirm --onefile --windowed --name imgconvert main.py
+```
+
+PyInstaller 不能交叉编译，Windows 的 `exe` 只能在 Windows 上打。推送 `v*` 标签会触发
+[.github/workflows/release.yml](.github/workflows/release.yml)，在各自的系统上构建
+Windows 与 Linux 版本并发布到 Releases。
