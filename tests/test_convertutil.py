@@ -223,6 +223,32 @@ class ConvertUtilTestCase(unittest.TestCase):
             self.util.convert_img(path, output_dir=self.out)
         self.assertIn("PDF", str(ctx.exception))
 
+    def test_broken_pdf_does_not_keep_the_file_open(self):
+        """异常链一旦引用 pymupdf 的栈帧，损坏的 PDF 在 Windows 上就会被一直占用"""
+        path = os.path.join(self.tmp, "broken.pdf")
+        with open(path, "wb") as fp:
+            fp.write(b"not a pdf")
+        with self.assertRaises(ConvertError) as ctx:
+            self.util.convert_img(path, output_dir=self.out)
+        # 这两条在任何平台都成立，是「句柄不会被攥住」的直接原因
+        self.assertIsNone(ctx.exception.__cause__)
+        self.assertIsNone(ctx.exception.__context__)
+        # Windows 上句柄没释放的话，下面这行会抛 PermissionError
+        os.remove(path)
+
+    def test_page_render_failure_does_not_keep_the_file_open(self):
+        pdf = self.pdf()
+
+        def boom(*args, **kwargs):
+            raise RuntimeError("mupdf exploded")
+
+        with mock.patch.object(convertutil.pymupdf.Page, "get_pixmap", boom):
+            with self.assertRaises(ConvertError) as ctx:
+                self.util.convert_img(pdf, output_dir=self.out)
+        self.assertIsNone(ctx.exception.__cause__)
+        self.assertIsNone(ctx.exception.__context__)
+        os.remove(pdf)
+
     def test_encrypted_pdf(self):
         path = self.pdf(
             name="locked.pdf",

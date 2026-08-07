@@ -202,11 +202,18 @@ class ConvertUtil:
             merged.close()
 
     def _open_pdf(self, pdf_file_path):
+        doc = None
+        reason = None
         try:
             doc = pymupdf.open(pdf_file_path)
         except Exception as exc:  # 文件损坏、不是 PDF、没有读权限等
             logger.exception("打开 PDF 失败")
-            raise ConvertError("无法打开该文件，可能不是有效的 PDF：%s" % exc) from exc
+            reason = str(exc)
+        if reason is not None:
+            # 必须在 except 块外面抛：异常链（__cause__ / __context__）会一直引用
+            # pymupdf 内部的栈帧，而那个栈帧里还攥着已打开的文件流。Windows 上
+            # 句柄不放，用户连这个损坏的 PDF 都删不掉。
+            raise ConvertError("无法打开该文件，可能不是有效的 PDF：%s" % reason)
         if doc.needs_pass:
             doc.close()
             raise ConvertError("这个 PDF 有密码保护，无法转换。")
@@ -257,15 +264,20 @@ class ConvertUtil:
         y = 0
         total = len(sizes)
         for index, page in enumerate(doc):
+            pix = None
+            reason = None
             try:
                 pix = page.get_pixmap(
                     matrix=matrix, alpha=False, colorspace=pymupdf.csRGB
                 )
             except Exception as exc:  # 某一页的内容损坏时，指明是第几页
                 logger.exception("第 %d 页渲染失败", index + 1)
+                reason = str(exc)
+            if reason is not None:
+                # 同样在 except 块外面抛，别让异常链攥着 pymupdf 的栈帧
                 raise ConvertError(
-                    "第 %d 页渲染失败，这一页的内容可能已损坏：%s" % (index + 1, exc)
-                ) from exc
+                    "第 %d 页渲染失败，这一页的内容可能已损坏：%s" % (index + 1, reason)
+                )
             page_img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
             if pages_dir:
                 page_img.save(os.path.join(pages_dir, "%d.png" % index))
