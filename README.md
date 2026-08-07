@@ -2,6 +2,13 @@
 
 > `imgconvert-tool` 是一款“将PDF文档转换合成为一张图片”的小工具
 
+## 下载
+
+[Releases](https://github.com/yuanqimanong/imgconvert-tool/releases) 里有各平台打包好的版本，
+下载即用，不需要装 Python：Windows 64 位、macOS（Apple Silicon / Intel）、Linux 64 位。
+
+macOS 版没有做代码签名，首次打开需要在 Finder 里右键选「打开」；Linux 版下载后需要 `chmod +x`。
+
 ## 使用方法
 
 1. 打开软件
@@ -36,6 +43,7 @@ pip install pyinstaller
 pyinstaller --noconfirm --onefile --windowed --name imgconvert main.py
 ```
 
-PyInstaller 不能交叉编译，Windows 的 `exe` 只能在 Windows 上打。推送 `v*` 标签会触发
-[.github/workflows/release.yml](.github/workflows/release.yml)，在各自的系统上构建
-Windows 与 Linux 版本并发布到 Releases。
+PyInstaller 不能交叉编译，每个平台的包只能在对应系统上打。推送 `v*` 标签会触发
+[.github/workflows/release.yml](.github/workflows/release.yml)，在 `windows-latest`、
+`macos-latest`（Apple Silicon）、`macos-13`（Intel）、`ubuntu-latest` 上分别构建，
+测试通过后一起发布到 Releases。

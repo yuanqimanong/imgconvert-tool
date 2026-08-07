@@ -18,12 +18,17 @@ jobs:
         include:
           - os: windows-latest
             label: windows-x86_64
-            built: dist/imgconvert.exe
             artifact: imgconvert-windows-x86_64.exe
           - os: ubuntu-latest
             label: linux-x86_64
-            built: dist/imgconvert
             artifact: imgconvert-linux-x86_64
+          # macos-latest 是 Apple Silicon，macos-13 是 Intel，两个架构分别出包
+          - os: macos-latest
+            label: macos-arm64
+            artifact: imgconvert-macos-arm64.zip
+          - os: macos-13
+            label: macos-x86_64
+            artifact: imgconvert-macos-x86_64.zip
     steps:
       - uses: actions/checkout@v4
 
@@ -36,7 +41,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pyinstaller
 
-      # Windows runner 有图形环境，GUI 测试会真的跑；
+      # Windows / macOS runner 有图形环境，GUI 测试会真的跑；
       # ubuntu runner 没有 DISPLAY，GUI 测试会自动跳过，核心逻辑测试照常执行。
       - name: 跑测试
         run: python -m unittest discover -s tests -v
@@ -44,9 +49,20 @@ jobs:
       - name: 打包
         run: pyinstaller --noconfirm --onefile --windowed --name imgconvert main.py
 
-      - name: 重命名产物
+      # macOS 上 --windowed 出的是 .app 目录，要用 ditto 打包才能保住
+      # 可执行权限和符号链接，直接 zip 会让 app 在对方机器上打不开。
+      - name: 整理产物
         shell: bash
-        run: mv "${{ matrix.built }}" "${{ matrix.artifact }}"
+        env:
+          ARTIFACT: ${{ matrix.artifact }}
+        run: |
+          case "$RUNNER_OS" in
+            Windows) mv dist/imgconvert.exe "$ARTIFACT" ;;
+            Linux)   mv dist/imgconvert "$ARTIFACT" ;;
+            macOS)   ditto -c -k --keepParent dist/imgconvert.app "$ARTIFACT" ;;
+            *)       echo "未知平台 $RUNNER_OS" >&2; exit 1 ;;
+          esac
+          ls -lh "$ARTIFACT"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -76,7 +92,18 @@ jobs:
             --title "${{ github.ref_name }}" \
             --notes "下载对应系统的可执行文件，双击运行，无需安装 Python。
 
-          - \`imgconvert-windows-x86_64.exe\` — Windows 64 位
-          - \`imgconvert-linux-x86_64\` — Linux 64 位（下载后需 \`chmod +x\`）
+          | 系统 | 文件 |
+          | --- | --- |
+          | Windows 64 位 | \`imgconvert-windows-x86_64.exe\` |
+          | macOS Apple Silicon | \`imgconvert-macos-arm64.zip\` |
+          | macOS Intel | \`imgconvert-macos-x86_64.zip\` |
+          | Linux 64 位 | \`imgconvert-linux-x86_64\` |
 
-          合成图输出在可执行文件所在目录的 \`out\` 子目录下。用法见 [README](https://github.com/${{ github.repository }}#readme)。"
+          合成图输出在可执行文件所在目录的 \`out\` 子目录下。用法见 [README](https://github.com/${{ github.repository }}#readme)。
+
+          说明：
+
+          - Linux 版下载后需要 \`chmod +x imgconvert-linux-x86_64\`
+          - macOS 版没有做代码签名和公证，首次打开会被 Gatekeeper 拦住。
+            解压后在 Finder 里右键选「打开」，或执行
+            \`xattr -dr com.apple.quarantine imgconvert.app\`"
