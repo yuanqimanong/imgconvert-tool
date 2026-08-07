@@ -43,7 +43,7 @@ pip install pyinstaller
 pyinstaller --noconfirm --onefile --windowed --name imgconvert main.py
 ```
 
-PyInstaller 不能交叉编译，每个平台的包只能在对应系统上打。推送 `v*` 标签会触发
-[.github/workflows/release.yml](.github/workflows/release.yml)，在 `windows-latest`、
-`macos-latest`（Apple Silicon）、`macos-13`（Intel）、`ubuntu-latest` 上分别构建，
-测试通过后一起发布到 Releases。
+产物在 `dist` 目录下。PyInstaller 不能交叉编译，哪个平台的包就得在哪个平台上打。
+
+Releases 里的多平台版本由 CI 构建，推送 `v*` 标签即可触发，配置见
+[.github/workflows/release.yml](.github/workflows/release.yml)。
