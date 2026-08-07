@@ -1,0 +1,5 @@
+# 实测通过的版本：PyMuPDF 1.28.2 + Pillow 12.3.0（均为当前最新）
+# PyMuPDF 1.19 起才有 get_pixmap / prerotate 这套接口，1.24.3 起可以 import pymupdf
+PyMuPDF>=1.24.3
+# 这个工具会把来源不明的 PDF 喂给图像解码器，Pillow 下限取修过图像解析安全问题的版本
+Pillow>=11.3.0

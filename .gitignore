@@ -5,3 +5,17 @@
 *.iml
 out
 gen
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# 程序运行产物
+tmp_images/
