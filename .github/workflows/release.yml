@@ -12,6 +12,8 @@ jobs:
   build:
     name: 打包 ${{ matrix.label }}
     runs-on: ${{ matrix.os }}
+    # 排不到 runner 时宁可失败，也别无限排队把整个发布卡住
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -22,11 +24,12 @@ jobs:
           - os: ubuntu-latest
             label: linux-x86_64
             artifact: imgconvert-linux-x86_64
-          # macos-latest 是 Apple Silicon，macos-13 是 Intel，两个架构分别出包
+          # macos-latest 是 Apple Silicon；Intel 用 macos-15-intel，
+          # 老的 macos-13 已经被 GitHub 退役，指过去会一直排不到机器
           - os: macos-latest
             label: macos-arm64
             artifact: imgconvert-macos-arm64.zip
-          - os: macos-13
+          - os: macos-15-intel
             label: macos-x86_64
             artifact: imgconvert-macos-x86_64.zip
     steps:

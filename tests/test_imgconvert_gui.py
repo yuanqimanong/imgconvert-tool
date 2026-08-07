@@ -1,5 +1,6 @@
 """GUI 层测试：需要图形环境，没有 DISPLAY 时自动跳过。"""
 
+import gc
 import logging
 import os
 import sys
@@ -17,6 +18,8 @@ try:
 
     _probe = tkinter.Tk()
     _probe.destroy()
+    del _probe
+    gc.collect()  # 探测用的根也在主线程收干净，别留到后面被工作线程回收
     HAS_DISPLAY = True
 except Exception:  # 无 DISPLAY / 没装 tk
     HAS_DISPLAY = False
@@ -98,7 +101,24 @@ class ImgConvertGuiTestCase(unittest.TestCase):
         self.app.open_in_file_manager = self.opened_dirs.append
 
     def tearDown(self):
+        # 这一段的顺序不能随便动，否则 Windows 上整个测试进程会被 Tcl 直接 panic
+        # 掉（Tcl_AsyncDelete: async handler deleted by the wrong thread）：
+        # 1) 先等后台线程收工。Tk 变量的 __del__ 会回调 Tcl，只要还有 Tk 对象在
+        #    待回收队列里，工作线程一做内存分配就可能在自己线程里触发 GC 去执行
+        #    这些终结器，而 Tcl 解释器只允许创建它的线程碰。
+        if self.app.worker:
+            self.app.worker.join(timeout=120)
+        # 2) 放掉 Tk 变量并立刻在主线程回收——必须在 destroy() 之前，
+        #    解释器没了再回收会抛 RuntimeError: main thread is not in main loop。
+        self.app.file_path = None
+        self.app.status_text = None
+        self.app.keep_pages = None
+        gc.collect()
+        # 3) 销毁窗口，再把根对象也在主线程里收干净，不留给下一个测试。
         self.app.destroy()
+        self.app = None
+        gc.collect()
+
         self.imgconvert.messagebox = self._orig_box
         self.imgconvert.filedialog = self._orig_dialog
         convertutil.DEFAULT_OUTPUT_DIR = self._orig_out
